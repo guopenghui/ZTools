@@ -21,6 +21,21 @@ interface ConfirmOptions {
   cancelText?: string
 }
 
+interface ConfirmExtraItem {
+  id: string
+  message: string
+  defaultChecked?: boolean
+}
+
+interface ConfirmWithExtraOptions extends ConfirmOptions {
+  extra: ConfirmExtraItem[]
+}
+
+interface ConfirmWithExtraResult {
+  confirmed: boolean
+  extra: Record<string, boolean>
+}
+
 interface ConfirmState {
   visible: boolean
   title: string
@@ -28,7 +43,9 @@ interface ConfirmState {
   type: 'info' | 'warning' | 'danger'
   confirmText: string
   cancelText: string
-  resolve: ((value: boolean) => void) | null
+  extra: ConfirmExtraItem[]
+  extraValues: Record<string, boolean>
+  resolve: ((value: any) => void) | null
 }
 
 const toastState = ref<ToastState>({
@@ -45,6 +62,8 @@ const confirmState = ref<ConfirmState>({
   type: 'info',
   confirmText: '确定',
   cancelText: '取消',
+  extra: [],
+  extraValues: {},
   resolve: null
 })
 
@@ -58,6 +77,7 @@ export function useToast(): {
   info: (message: string, duration?: number) => void
   hide: () => void
   confirm: (options: ConfirmOptions) => Promise<boolean>
+  confirmWithExtra: (options: ConfirmWithExtraOptions) => Promise<ConfirmWithExtraResult>
   handleConfirm: () => void
   handleCancel: () => void
 } {
@@ -100,6 +120,30 @@ export function useToast(): {
         type: options.type || 'info',
         confirmText: options.confirmText || '确定',
         cancelText: options.cancelText || '取消',
+        extra: [],
+        extraValues: {},
+        resolve
+      }
+    })
+  }
+
+  /**
+   * 加勾选框来额外获取一些信息
+   */
+  const confirmWithExtra = (options: ConfirmWithExtraOptions): Promise<ConfirmWithExtraResult> => {
+    return new Promise((resolve) => {
+      const extraValues = Object.fromEntries(
+        options.extra.map((item) => [item.id, item.defaultChecked ?? false])
+      )
+      confirmState.value = {
+        visible: true,
+        title: options.title || '确认操作',
+        message: options.message,
+        type: options.type || 'info',
+        confirmText: options.confirmText || '确定',
+        cancelText: options.cancelText || '取消',
+        extra: options.extra,
+        extraValues,
         resolve
       }
     })
@@ -107,14 +151,28 @@ export function useToast(): {
 
   const handleConfirm = (): void => {
     if (confirmState.value.resolve) {
-      confirmState.value.resolve(true)
+      if (confirmState.value.extra.length > 0) {
+        confirmState.value.resolve({
+          confirmed: true,
+          extra: { ...confirmState.value.extraValues }
+        })
+      } else {
+        confirmState.value.resolve(true)
+      }
     }
     confirmState.value.visible = false
   }
 
   const handleCancel = (): void => {
     if (confirmState.value.resolve) {
-      confirmState.value.resolve(false)
+      if (confirmState.value.extra.length > 0) {
+        confirmState.value.resolve({
+          confirmed: false,
+          extra: { ...confirmState.value.extraValues }
+        })
+      } else {
+        confirmState.value.resolve(false)
+      }
     }
     confirmState.value.visible = false
   }
@@ -129,6 +187,7 @@ export function useToast(): {
     info,
     hide,
     confirm,
+    confirmWithExtra,
     handleConfirm,
     handleCancel
   }
