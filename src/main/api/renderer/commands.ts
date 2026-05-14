@@ -1139,6 +1139,12 @@ export class AppsAPI {
               })
             } else if (typeof cmd === 'object') {
               // 匹配指令
+              const matchCmd = {
+                ...cmd,
+                type: cmd.type,
+                match: cmd.match ?? cmd.regex ?? ''
+              }
+
               regexCommands.push({
                 name: cmd.label || feature.explain || '',
                 path: plugin.path,
@@ -1149,10 +1155,7 @@ export class AppsAPI {
                 pluginTitle: plugin.title,
                 pluginExplain: feature.explain,
                 cmdType: cmd.type,
-                matchCmd: {
-                  type: cmd.type,
-                  match: cmd.match || cmd.regex || ''
-                }
+                matchCmd
               })
             }
           }

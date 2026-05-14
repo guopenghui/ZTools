@@ -2,7 +2,14 @@
 import { computed, onMounted, ref } from 'vue'
 import settingsFillIcon from '@/assets/image/settings-fill.png'
 import { weightedSearch } from '@/utils'
-import { AdaptiveIcon, CommandTag, FeatureCard, TagDropdown, CommandCard } from '@/components'
+import {
+  AdaptiveIcon,
+  CommandTag,
+  FeatureCard,
+  TagDropdown,
+  CommandCard,
+  MatchCommandDetailDialog
+} from '@/components'
 import type { TagDropdownMenuItem } from '@/components'
 import { useZtoolsSubInput } from '@/composables'
 import {
@@ -21,6 +28,17 @@ export type CommandType = 'direct' | 'plugin' | 'builtin'
 export type CommandSubType = 'app' | 'system-setting' | 'local-shortcut'
 export type CommandCmdType = 'text' | 'regex' | 'over' | 'img' | 'files' | 'window'
 
+type MatchCmd = {
+  type: string
+  match: string | Record<string, any>
+  exclude?: string
+  minLength?: number
+  maxLength?: number
+  fileType?: 'file' | 'directory'
+  extensions?: string[]
+  [key: string]: any
+}
+
 export interface Command {
   name: string
   path?: string
@@ -32,10 +50,23 @@ export interface Command {
   featureCode?: string
   pluginExplain?: string
   cmdType?: CommandCmdType
-  matchCmd?: {
-    type: string
-    match: string
-  }
+  matchCmd?: MatchCmd
+}
+
+interface Feature {
+  code: string
+  name: string
+  explain: string
+  icon: string
+  textCmds: {
+    text: string
+    name: string
+  }[]
+  matchCmds: {
+    type: CommandCmdType
+    match: MatchCmd
+    name: string
+  }[]
 }
 
 interface Source {
@@ -55,6 +86,16 @@ const regexCommands = ref<Command[]>([])
 const plugins = ref<any[]>([])
 const selectedSource = ref<Source | null>(null)
 const activeTab = ref<'text' | 'match'>('text')
+const selectedMatchCommand = ref<{
+  command: any
+  feature: {
+    code: string
+    name: string
+    explain: string
+  }
+  pluginName: string
+  pluginTitle: string
+} | null>(null)
 
 // 禁用指令列表
 const disabledCommands = ref<string[]>([])
@@ -88,14 +129,14 @@ function getPluginCommandId(
   pluginName: string,
   featureCode: string,
   cmdName: string,
-  cmdType: string
+  cmdType: CommandCmdType
 ): string {
   return getCommandId({
     type: 'plugin',
     pluginName,
     featureCode,
     name: cmdName,
-    cmdType
+    cmdType: cmdType
   })
 }
 
@@ -157,7 +198,7 @@ function isCommandDisabled(
   pluginName: string,
   featureCode: string,
   cmdName: string,
-  cmdType: string
+  cmdType: CommandCmdType
 ): boolean {
   const id = getPluginCommandId(pluginName, featureCode, cmdName, cmdType)
   return disabledCommands.value.includes(id)
@@ -173,7 +214,7 @@ async function toggleCommandDisabled(
   pluginName: string,
   featureCode: string,
   cmdName: string,
-  cmdType: string
+  cmdType: CommandCmdType
 ): Promise<void> {
   const id = getPluginCommandId(pluginName, featureCode, cmdName, cmdType)
   const index = disabledCommands.value.indexOf(id)
@@ -440,6 +481,14 @@ function getMenuItems(
 
   const canAddAlias = isAliasableCmdType(cmdType) && pluginName && featureCode && cmdName
 
+  if (cmdType && cmdType !== 'text') {
+    items.push({
+      key: 'detail',
+      label: '查看详情',
+      icon: 'i-z-info'
+    })
+  }
+
   if (cmdType === 'text') {
     items.push({
       key: 'open',
@@ -514,7 +563,7 @@ async function handleMenuSelect(
   pluginName: string,
   featureCode: string,
   cmdName: string,
-  cmdType: string
+  cmdType: CommandCmdType
 ): Promise<void> {
   if (key === 'toggle') {
     toggleCommandDisabled(pluginName, featureCode, cmdName, cmdType)
@@ -533,6 +582,50 @@ async function handleMenuSelect(
     if (!isAliasableCmdType(cmdType)) return
     openAliasShortcut(pluginName, featureCode, cmdName, cmdType)
   }
+}
+
+function openMatchCommandDetail(feature: any, cmd: any): void {
+  const rawMatch =
+    cmd.match && typeof cmd.match === 'object' ? cmd.match : { match: cmd.match || '' }
+
+  selectedMatchCommand.value = {
+    command: {
+      ...rawMatch,
+      type: cmd.type,
+      label: cmd.name
+    },
+    feature: {
+      code: feature.code,
+      name: feature.name,
+      explain: feature.explain
+    },
+    pluginName: selectedSource.value?.name || '',
+    pluginTitle: selectedSource.value?.title || selectedSource.value?.name || ''
+  }
+}
+
+function closeMatchCommandDetail(): void {
+  selectedMatchCommand.value = null
+}
+
+async function handleMatchMenuSelect(key: string, feature: any, cmd: any): Promise<void> {
+  if (key === 'detail') {
+    openMatchCommandDetail(feature, cmd)
+    return
+  }
+
+  await handleMenuSelect(key, selectedSource.value?.name || '', feature.code, cmd.name, cmd.type)
+}
+
+async function toggleSelectedMatchCommandDisabled(): Promise<void> {
+  const detail = selectedMatchCommand.value
+  if (!detail) return
+  await toggleCommandDisabled(
+    detail.pluginName,
+    detail.feature.code,
+    detail.command.label || detail.command.name || '',
+    detail.command.type || ''
+  )
 }
 
 async function openCommand(
@@ -641,17 +734,7 @@ const groupedFeatures = computed(() => {
   if (!selectedSource.value || !selectedSource.value.path) return []
 
   const source = selectedSource.value
-  const featureMap = new Map<
-    string,
-    {
-      code: string
-      name: string
-      explain: string
-      icon: string
-      textCmds: any[]
-      matchCmds: any[]
-    }
-  >()
+  const featureMap = new Map<string, Feature>()
 
   // 收集功能指令
   allCommands.value
@@ -695,7 +778,8 @@ const groupedFeatures = computed(() => {
       }
       const feature = featureMap.get(key)!
       feature.matchCmds.push({
-        type: cmd.cmdType,
+        // regexCommand 的 cmdType 一定存在
+        type: cmd.cmdType!,
         match: cmd.matchCmd || { type: '', match: '' },
         name: cmd.name
       })
@@ -745,6 +829,25 @@ const textFeaturesCount = computed(() => {
 const matchFeaturesCount = computed(() => {
   // 统计有匹配指令的功能数量
   return filteredGroupedFeatures.value.filter((f) => f.matchCmds.length > 0).length
+})
+
+const selectedMatchCommandContext = computed(() => ({
+  pluginTitle: selectedMatchCommand.value?.pluginTitle,
+  featureName:
+    selectedMatchCommand.value?.feature.explain || selectedMatchCommand.value?.feature.name,
+  featureCode: selectedMatchCommand.value?.feature.code,
+  commandName: selectedMatchCommand.value?.command.label || selectedMatchCommand.value?.command.name
+}))
+
+const selectedMatchCommandDisabled = computed(() => {
+  const detail = selectedMatchCommand.value
+  if (!detail) return false
+  return isCommandDisabled(
+    detail.pluginName,
+    detail.feature.code,
+    detail.command.label || detail.command.name || '',
+    detail.command.type || ''
+  )
 })
 
 // 预计算每个插件的指令数量（一次遍历，避免 N 次全量 filter）
@@ -1030,16 +1133,7 @@ onMounted(async () => {
                   cmd.name
                 )
               "
-              @select="
-                (key) =>
-                  handleMenuSelect(
-                    key,
-                    selectedSource?.name || '',
-                    feature.code,
-                    cmd.name,
-                    cmd.type
-                  )
-              "
+              @select="(key) => handleMatchMenuSelect(key, feature, cmd)"
             >
               <CommandTag
                 :command="cmd"
@@ -1053,6 +1147,16 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <MatchCommandDetailDialog
+      :visible="!!selectedMatchCommand"
+      :command="selectedMatchCommand?.command"
+      :context="selectedMatchCommandContext"
+      :disabled="selectedMatchCommandDisabled"
+      show-toggle-disabled
+      @close="closeMatchCommandDetail"
+      @toggle-disabled="toggleSelectedMatchCommandDisabled"
+    />
   </div>
 </template>
 

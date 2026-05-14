@@ -7,7 +7,7 @@ interface Command {
   name?: string
   type?: 'text' | 'regex' | 'over' | 'img' | 'files' | 'window' | string
   match?: {
-    match?: string
+    match?: string | Record<string, any>
     minLength?: number
     maxLength?: number
     extensions?: string[]
@@ -32,6 +32,22 @@ const tagClass = computed(() => {
   // 否则使用 props.type
   return props.type ? `tag-${props.type}` : ''
 })
+
+function getMinLength(command?: Command): number {
+  return command?.match?.minLength ?? 1
+}
+
+function getMaxLength(command?: Command): number {
+  return command?.match?.maxLength ?? 10000
+}
+
+function getExtensions(command?: Command): string[] {
+  return command?.match?.extensions ?? []
+}
+
+function getFileType(command?: Command): string | undefined {
+  return command?.match?.fileType
+}
 </script>
 <template>
   <span :class="['command-tag', tagClass, { disabled: disabled }]">
@@ -51,9 +67,7 @@ const tagClass = computed(() => {
       <!-- 任意文本 -->
       <template v-else-if="command.type === 'over'">
         <span class="tag-badge">{{ command.name }}</span>
-        <span v-if="command.match" class="tag-badge">
-          {{ command.match.minLength || 1 }}-{{ command.match.maxLength || 10000 }}
-        </span>
+        <span class="tag-badge"> {{ getMinLength(command) }}-{{ getMaxLength(command) }} </span>
         <div class="i-z-text tag-icon font-size-12px" />
       </template>
 
@@ -66,13 +80,13 @@ const tagClass = computed(() => {
       <!-- 文件/文件夹 -->
       <template v-else-if="command.type === 'files'">
         <span class="tag-badge">{{ command.name }}</span>
-        <span v-if="command.match?.extensions" class="tag-badge">
-          {{ command.match.extensions.slice(0, 3).join(', ') }}
-          {{ command.match.extensions.length > 3 ? '...' : '' }}
+        <span v-if="getExtensions(command).length > 0" class="tag-badge">
+          {{ getExtensions(command).slice(0, 3).join(', ') }}
+          {{ getExtensions(command).length > 3 ? '...' : '' }}
         </span>
         <div
           :class="[
-            command.match?.fileType === 'directory' ? 'i-z-folder' : 'i-z-file',
+            getFileType(command) === 'directory' ? 'i-z-folder' : 'i-z-file',
             'tag-icon',
             'font-size-12px'
           ]"

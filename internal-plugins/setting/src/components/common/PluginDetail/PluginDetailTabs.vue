@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { CommandTag, FeatureCard } from '@/components'
+import { computed, ref } from 'vue'
+import { CommandTag, FeatureCard, MatchCommandDetailDialog, TagDropdown } from '@/components'
 import type { DocItem, PluginItem, TabId, TabItem } from './types'
 
-defineProps<{
+const props = defineProps<{
   plugin: PluginItem
   activeTab: TabId
   availableTabs: TabItem[]
@@ -27,6 +28,23 @@ const emit = defineEmits<{
   (e: 'clear-all-data'): void
 }>()
 
+const selectedMatchCommand = ref<{
+  command: any
+  feature: {
+    code?: string
+    name?: string
+    explain?: string
+  }
+} | null>(null)
+
+const selectedMatchCommandContext = computed(() => ({
+  pluginTitle: props.plugin.title || props.plugin.name,
+  featureName:
+    selectedMatchCommand.value?.feature.explain || selectedMatchCommand.value?.feature.name,
+  featureCode: selectedMatchCommand.value?.feature.code,
+  commandName: selectedMatchCommand.value?.command.label || selectedMatchCommand.value?.command.name
+}))
+
 function cmdKey(cmd: any): string {
   if (cmd && typeof cmd === 'object') {
     return cmd.label || cmd.text || cmd.name || ''
@@ -47,6 +65,33 @@ function normalizeCommand(cmd: any): any {
     text: String(cmd),
     type: 'text'
   }
+}
+
+function isMatchCommand(cmd: any): boolean {
+  return Boolean(cmd && typeof cmd === 'object' && cmd.type && cmd.type !== 'text')
+}
+
+function openMatchCommandDetail(feature: any, cmd: any): void {
+  const rawMatch =
+    cmd.match && typeof cmd.match === 'object' ? cmd.match : { match: cmd.match || cmd.regex || '' }
+
+  selectedMatchCommand.value = {
+    command: {
+      ...cmd,
+      ...rawMatch,
+      type: cmd.type,
+      label: cmd.label || cmd.name
+    },
+    feature: {
+      code: feature.code,
+      name: feature.name,
+      explain: feature.explain
+    }
+  }
+}
+
+function closeMatchCommandDetail(): void {
+  selectedMatchCommand.value = null
 }
 
 function formatJsonData(data: any): string {
@@ -109,11 +154,16 @@ function formatDate(dateStr?: string): string {
       <div v-if="activeTab === 'commands'" class="tab-panel">
         <div v-if="plugin.features && plugin.features.length > 0" class="feature-list">
           <FeatureCard v-for="feature in plugin.features" :key="feature.code" :feature="feature">
-            <CommandTag
-              v-for="cmd in feature.cmds"
-              :key="cmdKey(cmd)"
-              :command="normalizeCommand(cmd)"
-            />
+            <template v-for="cmd in feature.cmds" :key="cmdKey(cmd)">
+              <TagDropdown
+                v-if="isMatchCommand(cmd)"
+                :menu-items="[{ key: 'detail', label: '查看详情', icon: 'i-z-info' }]"
+                @select="openMatchCommandDetail(feature, cmd)"
+              >
+                <CommandTag :command="normalizeCommand(cmd)" show-arrow />
+              </TagDropdown>
+              <CommandTag v-else :command="normalizeCommand(cmd)" />
+            </template>
           </FeatureCard>
         </div>
         <div v-else class="empty-message">暂无指令</div>
@@ -208,6 +258,13 @@ function formatDate(dateStr?: string): string {
       <!-- 额外 Tab 内容（留言等） -->
       <slot name="extra-tabs" />
     </div>
+
+    <MatchCommandDetailDialog
+      :visible="!!selectedMatchCommand"
+      :command="selectedMatchCommand?.command"
+      :context="selectedMatchCommandContext"
+      @close="closeMatchCommandDetail"
+    />
   </div>
 </template>
 
