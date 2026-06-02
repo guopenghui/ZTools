@@ -224,12 +224,17 @@ declare global {
         getCurrentShortcut: () => Promise<string>
         registerGlobalShortcut: (
           shortcut: string,
-          target: string
+          target: string,
+          autoCopy?: boolean
         ) => Promise<{ success: boolean; error?: string }>
         unregisterGlobalShortcut: (shortcut: string) => Promise<{
           success: boolean
           error?: string
         }>
+        updateGlobalShortcutConfig: (
+          shortcut: string,
+          config: { autoCopy: boolean }
+        ) => Promise<{ success: boolean; error?: string }>
         registerAppShortcut: (
           shortcut: string,
           target: string

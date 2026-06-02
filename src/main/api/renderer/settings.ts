@@ -56,6 +56,8 @@ export class SettingsAPI {
   private recordingShortcuts: string[] = []
   private lastGlobalShortcutTriggeredAt = new Map<string, number>()
   private globalShortcutKeyboardStateReleasers = new Map<string, () => void>()
+  // 全局快捷键配置映射（存储每个快捷键的 autoCopy 等配置）
+  private globalShortcutConfigs: Map<string, { autoCopy: boolean }> = new Map()
 
   private setupIPC(): void {
     // 主题
@@ -70,11 +72,18 @@ export class SettingsAPI {
     // 快捷键
     ipcMain.handle('update-shortcut', (_event, shortcut: string) => this.updateShortcut(shortcut))
     ipcMain.handle('get-current-shortcut', () => this.getCurrentShortcut())
-    ipcMain.handle('register-global-shortcut', (_event, shortcut: string, target: string) =>
-      this.registerGlobalShortcut(shortcut, target)
+    ipcMain.handle(
+      'register-global-shortcut',
+      (_event, shortcut: string, target: string, autoCopy?: boolean) =>
+        this.registerGlobalShortcut(shortcut, target, autoCopy ?? false)
     )
     ipcMain.handle('unregister-global-shortcut', (_event, shortcut: string) =>
       this.unregisterGlobalShortcut(shortcut)
+    )
+    ipcMain.handle(
+      'update-global-shortcut-config',
+      (_event, shortcut: string, config: { autoCopy: boolean }) =>
+        this.updateGlobalShortcutConfig(shortcut, config)
     )
 
     // 应用快捷键
@@ -160,7 +169,11 @@ export class SettingsAPI {
         for (const shortcut of shortcuts) {
           if (shortcut.enabled && shortcut.shortcut && shortcut.target) {
             try {
-              await this.registerGlobalShortcut(shortcut.shortcut, shortcut.target)
+              await this.registerGlobalShortcut(
+                shortcut.shortcut,
+                shortcut.target,
+                shortcut.autoCopy ?? false
+              )
             } catch (error) {
               console.error(`注册全局快捷键失败: ${shortcut.shortcut}`, error)
             }
@@ -252,8 +265,18 @@ export class SettingsAPI {
    * 注册全局快捷键。
    * 触发时会按需采集当前外部应用中的选中文本，再把上下文交给上层统一处理。
    */
-  public async registerGlobalShortcut(shortcut: string, target: string): Promise<any> {
+  public async registerGlobalShortcut(
+    shortcut: string,
+    target: string,
+    autoCopy: boolean = false
+  ): Promise<any> {
+    console.log(`[Settings] 注册全局快捷键: ${shortcut} -> ${target}, autoCopy: ${autoCopy}`)
+
     try {
+      // 存储快捷键配置
+      this.globalShortcutConfigs.set(shortcut, { autoCopy })
+      console.log('[Settings] 快捷键配置已存储到 Map')
+
       this.ensureGlobalShortcutKeyboardState(shortcut)
       const preparation = await api.prepareGlobalShortcut(target)
 
@@ -262,7 +285,7 @@ export class SettingsAPI {
         doubleTapManager.unregister(modifier)
         doubleTapManager.register(modifier, () => {
           console.log(`双击修饰键触发: ${shortcut} -> ${target}`)
-          void this.triggerGlobalShortcut(preparation)
+          void this.triggerGlobalShortcut(shortcut, preparation)
         })
         console.log(`成功注册双击修饰键快捷键: ${shortcut} -> ${target}`)
         return { success: true }
@@ -273,11 +296,12 @@ export class SettingsAPI {
 
       const success = globalShortcut.register(shortcut, () => {
         console.log(`全局快捷键触发: ${shortcut} -> ${target}`)
-        void this.triggerGlobalShortcut(preparation)
+        void this.triggerGlobalShortcut(shortcut, preparation)
       })
 
       if (!success) {
         this.releaseGlobalShortcutKeyboardState(shortcut)
+        this.globalShortcutConfigs.delete(shortcut)
         return { success: false, error: '快捷键注册失败，可能已被其他应用占用' }
       }
 
@@ -285,6 +309,7 @@ export class SettingsAPI {
       return { success: true }
     } catch (error: unknown) {
       this.releaseGlobalShortcutKeyboardState(shortcut)
+      this.globalShortcutConfigs.delete(shortcut)
       console.error('[Settings] 注册全局快捷键失败:', error)
       return { success: false, error: error instanceof Error ? error.message : '未知错误' }
     }
@@ -294,6 +319,7 @@ export class SettingsAPI {
   public unregisterGlobalShortcut(shortcut: string): any {
     try {
       this.releaseGlobalShortcutKeyboardState(shortcut)
+      this.globalShortcutConfigs.delete(shortcut)
 
       if (this.isDoubleTapShortcut(shortcut)) {
         const modifier = this.getDoubleTapModifier(shortcut)
@@ -307,6 +333,22 @@ export class SettingsAPI {
       return { success: true }
     } catch (error: unknown) {
       console.error('[Settings] 注销全局快捷键失败:', error)
+      return { success: false, error: error instanceof Error ? error.message : '未知错误' }
+    }
+  }
+
+  /**
+   * 更新全局快捷键的配置（如 autoCopy）
+   * 仅更新配置，不重新注册快捷键
+   */
+  public updateGlobalShortcutConfig(shortcut: string, config: { autoCopy: boolean }): any {
+    try {
+      console.log(`[Settings] 更新全局快捷键配置: ${shortcut}, autoCopy: ${config.autoCopy}`)
+      this.globalShortcutConfigs.set(shortcut, config)
+      console.log('[Settings] 配置更新成功')
+      return { success: true }
+    } catch (error: unknown) {
+      console.error('[Settings] 更新全局快捷键配置失败:', error)
       return { success: false, error: error instanceof Error ? error.message : '未知错误' }
     }
   }
@@ -337,14 +379,28 @@ export class SettingsAPI {
    * 处理全局快捷键的统一触发入口。
    * 仅在目标命令需要文本上下文时才会执行复制取词，避免无关快捷键产生副作用。
    */
-  private async triggerGlobalShortcut(preparation: GlobalShortcutPreparation): Promise<void> {
+  private async triggerGlobalShortcut(
+    shortcut: string,
+    preparation: GlobalShortcutPreparation
+  ): Promise<void> {
     if (!this.shouldTriggerGlobalShortcut(preparation.target)) {
       return
     }
 
-    const context = preparation.shouldCaptureSelectedText
-      ? await this.captureSelectedTextContext()
-      : undefined
+    // 读取该快捷键的 autoCopy 配置，默认 false
+    const config = this.globalShortcutConfigs.get(shortcut)
+    const autoCopy = config?.autoCopy ?? false
+
+    console.log(`[Settings] 快捷键触发: ${shortcut}`)
+    console.log(`[Settings] 指令类型需要文本: ${preparation.shouldCaptureSelectedText}`)
+    console.log(`[Settings] 用户启用自动复制: ${autoCopy}`)
+
+    // 双重判断：指令类型需要文本 AND 用户启用自动复制
+    const shouldCapture = preparation.shouldCaptureSelectedText && autoCopy
+
+    console.log(`[Settings] 最终是否执行取词: ${shouldCapture}`)
+
+    const context = shouldCapture ? await this.captureSelectedTextContext() : undefined
     await this.handleGlobalShortcut(preparation.target, context)
   }
 
@@ -373,31 +429,51 @@ export class SettingsAPI {
    * 会等待触发快捷键的按键全部弹起后再执行复制，避免修饰键残留改变复制组合键。
    */
   private async captureSelectedTextContext(): Promise<ShortcutLaunchContext> {
+    console.log('[Settings] 开始捕获选中文本...')
     try {
+      console.log('[Settings] 等待按键释放...')
       await doubleTapManager.waitForAllKeysReleased(KEY_RELEASE_WAIT_TIMEOUT_MS)
+      console.log('[Settings] 按键已释放')
 
       const lastSequence = clipboardManager.getLastCopiedSequence()
+      console.log('[Settings] 上次剪贴板序列号:', lastSequence)
+
       const modifier = process.platform === 'darwin' ? 'meta' : 'ctrl'
+      console.log('[Settings] 模拟按键: Ctrl/Cmd+C')
       NativeWindowManager.simulateKeyboardTap('c', modifier)
 
+      console.log('[Settings] 等待剪贴板更新，超时时间:', CLIPBOARD_COPY_WAIT_TIMEOUT_MS, 'ms')
       const lastCopiedContent = await clipboardManager.waitForNextCopiedContent(
         lastSequence,
         CLIPBOARD_COPY_WAIT_TIMEOUT_MS
       )
 
+      console.log('[Settings] 剪贴板内容:', lastCopiedContent)
+
       if (lastCopiedContent?.type === 'text' && typeof lastCopiedContent.data === 'string') {
         const text = lastCopiedContent.data
+        console.log('[Settings] 捕获到文本，长度:', text.length)
         if (text.trim()) {
+          console.log('[Settings] 文本捕获成功')
           return {
             searchQuery: text,
             pastedImage: null,
             pastedFiles: null,
             pastedText: text
           }
+        } else {
+          console.log('[Settings] 文本为空')
         }
+      } else {
+        console.log('[Settings] 未捕获到文本内容')
       }
     } catch (error) {
       console.error('[Settings] 获取选中文本失败:', error)
+      if (error instanceof Error && error.message.includes('timeout')) {
+        console.error(
+          '[Settings] 等待复制超时！可能原因：1) 没有选中文本 2) 应用不支持复制 3) 网络延迟'
+        )
+      }
     }
 
     return {
