@@ -57,6 +57,7 @@ interface WindowCmd {
   match: {
     app?: string[] // 匹配应用名称列表（如 ["Finder.app"]）
     title?: string // 匹配窗口标题的正则表达式字符串
+    className?: string[]
   }
 }
 
@@ -1350,7 +1351,7 @@ export const useCommandDataStore = defineStore('commandData', () => {
 
   function matchesWindowCommand(
     command: Command,
-    windowInfo?: { app?: string; title?: string } | null
+    windowInfo?: { app?: string; title?: string; className?: string } | null
   ): boolean {
     if (
       !windowInfo ||
@@ -1368,7 +1369,10 @@ export const useCommandDataStore = defineStore('commandData', () => {
         // 直接字符串匹配
         return windowInfo.app === appPattern
       })
-      if (appMatches) {
+      const classNameMatches = windowCmd.match.className?.some(
+        (classNamePattern) => classNamePattern === (windowInfo.className || '')
+      )
+      if (appMatches && (!windowCmd.match.className || classNameMatches)) {
         return true
       }
     }
@@ -1385,7 +1389,11 @@ export const useCommandDataStore = defineStore('commandData', () => {
   }
 
   // 搜索支持窗口的指令（根据当前激活窗口进行匹配）
-  function searchWindowCommands(windowInfo?: { app?: string; title?: string }): SearchResult[] {
+  function searchWindowCommands(windowInfo?: {
+    app?: string
+    title?: string
+    className?: string
+  }): SearchResult[] {
     if (!windowInfo || (!windowInfo.app && !windowInfo.title)) {
       return []
     }
