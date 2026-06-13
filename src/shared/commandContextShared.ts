@@ -245,7 +245,10 @@ export function matchesWindowInput(
   if (cmd.match.title && windowInfo.title) {
     const titleRegex =
       options.titleRegex ??
-      parseMatchPattern(cmd.match.title, { preserveFlags: options.preserveTitleFlags })
+      parseMatchPattern(cmd.match.title, {
+        preserveFlags: options.preserveTitleFlags,
+        allowPlainString: true
+      })
     if (titleRegex?.test(windowInfo.title)) {
       return true
     }

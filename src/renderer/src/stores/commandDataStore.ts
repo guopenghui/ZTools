@@ -1260,7 +1260,10 @@ export const useCommandDataStore = defineStore('commandData', () => {
     }
 
     try {
-      const regex = parseMatchPattern(pattern, { preserveFlags: false })
+      const regex = parseMatchPattern(pattern, {
+        preserveFlags: false,
+        allowPlainString: true
+      })
       if (!regex) {
         throw new Error('invalid regex pattern')
       }

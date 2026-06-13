@@ -188,6 +188,20 @@ describe('commandContextShared', () => {
       ).toBe(true)
     })
 
+    it('支持普通字符串 title 匹配', () => {
+      expect(
+        matchesWindowInput(
+          { title: 'Project - Claude Code' },
+          {
+            type: 'window',
+            match: {
+              title: 'Claude Code'
+            }
+          }
+        )
+      ).toBe(true)
+    })
+
     it('app 未命中时可由 title 命中', () => {
       expect(
         matchesWindowInput(
