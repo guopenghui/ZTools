@@ -751,6 +751,15 @@ export class InternalPluginAPI {
       }
     )
 
+    // 更新窗口呼出位置策略（直接通知主进程）
+    ipcMain.handle('internal:update-window-position-strategy', async (event, strategy: string) => {
+      if (!requireInternalPlugin(this.pluginManager, event)) {
+        throw new PermissionDeniedError('internal:update-window-position-strategy')
+      }
+      await windowAPI.updateWindowPositionStrategy(strategy)
+      return { success: true }
+    })
+
     // 通知主渲染进程更新显示最近使用配置
     ipcMain.handle(
       'internal:update-show-recent-in-search',

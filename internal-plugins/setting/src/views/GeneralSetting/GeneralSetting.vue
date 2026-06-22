@@ -8,7 +8,8 @@ import {
   type AutoPasteOption,
   type MouseButtonType,
   type PrimaryColor,
-  type ThemeType
+  type ThemeType,
+  type WindowPositionStrategy
 } from '@/constants'
 import { Dropdown, HotkeyInput, Slider, useToast } from '@/components'
 import { applyCustomColor, applyPrimaryColor } from '@/utils'
@@ -54,6 +55,13 @@ const autoBackToSearchOptions = [
   { label: '5分钟', value: '5m' },
   { label: '10分钟', value: '10m' },
   { label: '从不', value: 'never' }
+]
+
+const windowPositionStrategyOptions = [
+  { label: '记住上次位置', value: 'remember' },
+  { label: '鼠标屏居中', value: 'cursor' },
+  { label: '主屏居中', value: 'primary' },
+  { label: '上次活动屏居中', value: 'lastActive' }
 ]
 
 const recentRowsOptions = [
@@ -129,6 +137,7 @@ const avatar = ref(DEFAULT_AVATAR)
 const autoPaste = ref<AutoPasteOption>('3s')
 const autoClear = ref<AutoClearOption>('immediately')
 const autoBackToSearch = ref<AutoBackToSearchOption>('never')
+const windowPositionStrategy = ref<WindowPositionStrategy>('remember')
 const showRecentInSearch = ref(true)
 const showMatchRecommendation = ref(true)
 const localAppSearch = ref(true)
@@ -498,6 +507,17 @@ async function handleAutoBackToSearchChange(): Promise<void> {
     console.log('自动返回搜索配置已更新:', autoBackToSearch.value)
   } catch (error) {
     console.error('保存自动返回搜索配置失败:', error)
+  }
+}
+
+// 处理窗口呼出位置策略变化
+async function handleWindowPositionStrategyChange(): Promise<void> {
+  try {
+    await saveSettings()
+    await window.ztools.internal.updateWindowPositionStrategy(windowPositionStrategy.value)
+    console.log('窗口呼出位置策略已更新:', windowPositionStrategy.value)
+  } catch (error) {
+    console.error('保存窗口呼出位置策略失败:', error)
   }
 }
 
@@ -1203,6 +1223,7 @@ async function loadSettings(): Promise<void> {
       autoPaste.value = data.autoPaste ?? '3s'
       autoClear.value = data.autoClear ?? 'immediately'
       autoBackToSearch.value = data.autoBackToSearch ?? 'never'
+      windowPositionStrategy.value = data.windowPositionStrategy ?? 'remember'
       showRecentInSearch.value = data.showRecentInSearch ?? true
       showMatchRecommendation.value = data.showMatchRecommendation ?? true
       localAppSearch.value = data.localAppSearch ?? true
@@ -1296,6 +1317,7 @@ async function saveSettings(): Promise<void> {
       autoPaste: autoPaste.value,
       autoClear: autoClear.value,
       autoBackToSearch: autoBackToSearch.value,
+      windowPositionStrategy: windowPositionStrategy.value,
       showRecentInSearch: showRecentInSearch.value,
       showMatchRecommendation: showMatchRecommendation.value,
       localAppSearch: localAppSearch.value,
@@ -1868,6 +1890,20 @@ onUnmounted(() => {
             v-model="autoBackToSearch"
             :options="autoBackToSearchOptions"
             @change="handleAutoBackToSearchChange"
+          />
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span>窗口呼出位置</span>
+          <span class="setting-desc">每次呼出主窗口时的定位策略</span>
+        </div>
+        <div class="setting-control">
+          <Dropdown
+            v-model="windowPositionStrategy"
+            :options="windowPositionStrategyOptions"
+            @change="handleWindowPositionStrategyChange"
           />
         </div>
       </div>

@@ -90,6 +90,7 @@ class WindowManager {
   private windowPositionsByDisplay: Record<number, { x: number; y: number }> = {}
   private autoBackToSearchTimer: NodeJS.Timeout | null = null // 自动返回搜索定时器
   private autoBackToSearchConfig: string = 'never' // 自动返回搜索配置
+  private windowPositionStrategy: string = 'remember' // 窗口呼出位置策略
   private lastFocusTarget: 'mainWindow' | 'plugin' | null = null // 窗口隐藏前的焦点状态
   private isRestoringFocus: boolean = false // 是否正在恢复焦点状态（防止 focus 事件监听器干扰）
   private suppressBlurHide: boolean = false // 临时抑制 blur 事件隐藏窗口（文件关联打开等场景）
@@ -843,28 +844,52 @@ class WindowManager {
   }
 
   /**
-   * 将窗口移动到鼠标所在显示器
-   * 优先恢复该显示器记忆的位置，否则居中显示
+   * 根据窗口呼出位置策略将窗口移动到目标显示器并定位
+   * - remember：优先恢复该显示器记忆的位置，否则居中
+   * - cursor：鼠标所在显示器居中
+   * - primary：主显示器居中
+   * - lastActive：上次活动窗口所在显示器居中（无记录时 fallback 到鼠标屏）
    */
   private moveWindowToCursor(): void {
     if (!this.mainWindow) return
 
-    const { width, height, x: displayX, y: displayY, id: displayId } = this.getDisplayAtCursor()
+    let target: { width: number; height: number; x: number; y: number; id: number }
 
-    const savedPosition = this.windowPositionsByDisplay[displayId]
-
-    let x: number, y: number
-
-    if (savedPosition) {
-      // 恢复该显示器记忆的位置
-      x = savedPosition.x
-      y = savedPosition.y
-    } else {
-      // 计算默认居中位置（基于最大窗口高度）
-      x = displayX + Math.floor((width - WINDOW_WIDTH) / 2)
-      y = displayY + Math.floor((height - WINDOW_DEFAULT_HEIGHT) / 2)
+    switch (this.windowPositionStrategy) {
+      case 'primary': {
+        const display = screen.getPrimaryDisplay()
+        target = { ...display.workArea, id: display.id }
+        break
+      }
+      case 'lastActive': {
+        const prev = this.previousActiveWindow
+        if (prev && typeof prev.x === 'number' && typeof prev.y === 'number') {
+          const display = screen.getDisplayNearestPoint({ x: prev.x, y: prev.y })
+          target = { ...display.workArea, id: display.id }
+        } else {
+          target = this.getDisplayAtCursor()
+        }
+        break
+      }
+      case 'cursor': {
+        target = this.getDisplayAtCursor()
+        break
+      }
+      case 'remember':
+      default: {
+        const { width, height, x: displayX, y: displayY, id: displayId } = this.getDisplayAtCursor()
+        const savedPosition = this.windowPositionsByDisplay[displayId]
+        if (savedPosition) {
+          this.mainWindow.setPosition(savedPosition.x, savedPosition.y, false)
+          return
+        }
+        target = { width, height, x: displayX, y: displayY, id: displayId }
+        break
+      }
     }
 
+    const x = target.x + Math.floor((target.width - WINDOW_WIDTH) / 2)
+    const y = target.y + Math.floor((target.height - WINDOW_DEFAULT_HEIGHT) / 2)
     this.mainWindow.setPosition(x, y, false)
   }
 
@@ -1052,6 +1077,14 @@ class WindowManager {
   public async updateAutoBackToSearch(config: string): Promise<void> {
     this.autoBackToSearchConfig = config
     console.log('[Window] 更新自动返回搜索配置:', config)
+  }
+
+  /**
+   * 更新窗口呼出位置策略
+   */
+  public async updateWindowPositionStrategy(strategy: string): Promise<void> {
+    this.windowPositionStrategy = strategy
+    console.log('[Window] 更新窗口呼出位置策略:', strategy)
   }
 
   /**

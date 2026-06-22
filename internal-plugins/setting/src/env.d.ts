@@ -267,6 +267,7 @@ declare global {
         updateAutoPaste: (autoPaste: string) => Promise<void>
         updateAutoClear: (autoClear: string) => Promise<void>
         updateAutoBackToSearch: (autoBackToSearch: string) => Promise<void>
+        updateWindowPositionStrategy: (strategy: string) => Promise<void>
         updateShowRecentInSearch: (showRecentInSearch: boolean) => Promise<void>
         updateMatchRecommendation: (showMatchRecommendation: boolean) => Promise<void>
         updateLocalAppSearch: (enabled: boolean) => Promise<void>
