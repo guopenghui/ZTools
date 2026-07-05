@@ -231,12 +231,13 @@ declare global {
       registerGlobalShortcut: (
         shortcut: string,
         target: string,
-        autoCopy?: boolean
+        autoCopy?: boolean,
+        preScreenshotOptimization?: boolean
       ) => Promise<{ success: boolean; error?: string }>
       unregisterGlobalShortcut: (shortcut: string) => Promise<{ success: boolean; error?: string }>
       updateGlobalShortcutConfig: (
         shortcut: string,
-        config: { autoCopy: boolean }
+        config: { autoCopy: boolean; preScreenshotOptimization: boolean }
       ) => Promise<{ success: boolean; error?: string }>
       // 快捷键录制（临时注册，触发后自动注销）
       startHotkeyRecording: () => Promise<{ success: boolean; error?: string }>

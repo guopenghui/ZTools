@@ -242,6 +242,13 @@ class APIManager {
   }
 
   /**
+   * 清理 API 管理器持有的运行时资源。
+   */
+  public cleanup(): void {
+    settingsAPI.cleanup()
+  }
+
+  /**
    * 设置启动参数（用于插件进入时传递参数）
    */
   public setLaunchParam(param: any): void {
@@ -288,12 +295,22 @@ class APIManager {
   }
 
   /**
+   * 归一化快捷键目标字符串，兼容历史上带空格的“插件 / 指令”格式。
+   */
+  private parseShortcutTarget(target: string): string[] {
+    return target
+      .split('/')
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0)
+  }
+
+  /**
    * 预解析全局快捷键目标，判断启动前是否需要采集选中文本。
    * 仅文本类插件命令会触发复制取词，避免无关快捷键产生副作用。
    */
   public async prepareGlobalShortcut(target: string): Promise<GlobalShortcutPreparation> {
     try {
-      const parts = target.split('/')
+      const parts = this.parseShortcutTarget(target)
       const plugins: any = databaseAPI.dbGet('plugins')
       const disabledPlugins = pluginsAPI.getDisabledPluginSet()
       const pluginList = Array.isArray(plugins)
@@ -320,11 +337,11 @@ class APIManager {
         return { target, shouldCaptureSelectedText: false }
       }
 
-      const pluginMatches: { cmdType: string }[] = []
+      const pluginMatches: Array<{ cmdType: string; plugin: any; feature: any }> = []
       for (const plugin of pluginList) {
         const result = await this.findCommandInPlugin(plugin, target)
         if (result) {
-          pluginMatches.push({ cmdType: result.cmdType })
+          pluginMatches.push({ cmdType: result.cmdType, plugin, feature: result.feature })
         }
       }
 
@@ -555,7 +572,7 @@ class APIManager {
         ? plugins.filter((plugin: any) => !disabledPlugins.has(plugin.path))
         : []
 
-      const parts = target.split('/')
+      const parts = this.parseShortcutTarget(target)
 
       if (parts.length === 2) {
         // 格式: 插件名称/指令名称

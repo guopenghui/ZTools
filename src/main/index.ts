@@ -201,6 +201,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   windowManager.unregisterAllShortcuts()
+  api.cleanup()
   // 停止应用目录监听
   appWatcher.stop()
   // 清理悬浮球

@@ -687,11 +687,22 @@ export class InternalPluginAPI {
     // ==================== 全局快捷键 API ====================
     ipcMain.handle(
       'internal:register-global-shortcut',
-      async (event, shortcut: string, target: string) => {
+      async (
+        event,
+        shortcut: string,
+        target: string,
+        autoCopy?: boolean,
+        preScreenshotOptimization?: boolean
+      ) => {
         if (!requireInternalPlugin(this.pluginManager, event)) {
           throw new PermissionDeniedError('internal:register-global-shortcut')
         }
-        return settingsAPI.registerGlobalShortcut(shortcut, target)
+        return settingsAPI.registerGlobalShortcut(
+          shortcut,
+          target,
+          autoCopy ?? false,
+          preScreenshotOptimization ?? false
+        )
       }
     )
 
@@ -709,12 +720,33 @@ export class InternalPluginAPI {
       return await settingsAPI.startHotkeyRecording()
     })
 
+    ipcMain.handle('internal:get-current-shortcut', async (event) => {
+      if (!requireInternalPlugin(this.pluginManager, event)) {
+        throw new PermissionDeniedError('internal:get-current-shortcut')
+      }
+      return settingsAPI.getCurrentShortcutValue()
+    })
+
     ipcMain.handle('internal:update-shortcut', async (event, shortcut: string) => {
       if (!requireInternalPlugin(this.pluginManager, event)) {
         throw new PermissionDeniedError('internal:update-shortcut')
       }
       return await settingsAPI.updateShortcut(shortcut)
     })
+
+    ipcMain.handle(
+      'internal:update-global-shortcut-config',
+      async (
+        event,
+        shortcut: string,
+        config: { autoCopy: boolean; preScreenshotOptimization: boolean }
+      ) => {
+        if (!requireInternalPlugin(this.pluginManager, event)) {
+          throw new PermissionDeniedError('internal:update-global-shortcut-config')
+        }
+        return await settingsAPI.updateGlobalShortcutConfig(shortcut, config)
+      }
+    )
 
     // ==================== 应用快捷键 API ====================
     ipcMain.handle(

@@ -982,16 +982,24 @@ window.ztools = {
       await electron.ipcRenderer.invoke('internal:get-plugin-memory-info', pluginPath),
 
     // ==================== 全局快捷键 API ====================
-    registerGlobalShortcut: async (shortcut, target, autoCopy) =>
-      await electron.ipcRenderer.invoke('register-global-shortcut', shortcut, target, autoCopy),
+    registerGlobalShortcut: async (shortcut, target, autoCopy, preScreenshotOptimization) =>
+      await electron.ipcRenderer.invoke(
+        'internal:register-global-shortcut',
+        shortcut,
+        target,
+        autoCopy,
+        preScreenshotOptimization
+      ),
     unregisterGlobalShortcut: async (shortcut) =>
-      await electron.ipcRenderer.invoke('unregister-global-shortcut', shortcut),
+      await electron.ipcRenderer.invoke('internal:unregister-global-shortcut', shortcut),
     updateGlobalShortcutConfig: async (shortcut, config) =>
-      await electron.ipcRenderer.invoke('update-global-shortcut-config', shortcut, config),
-    startHotkeyRecording: async () => await electron.ipcRenderer.invoke('start-hotkey-recording'),
+      await electron.ipcRenderer.invoke('internal:update-global-shortcut-config', shortcut, config),
+    startHotkeyRecording: async () =>
+      await electron.ipcRenderer.invoke('internal:start-hotkey-recording'),
     updateShortcut: async (shortcut) =>
-      await electron.ipcRenderer.invoke('update-shortcut', shortcut),
-    getCurrentShortcut: async () => await electron.ipcRenderer.invoke('get-current-shortcut'),
+      await electron.ipcRenderer.invoke('internal:update-shortcut', shortcut),
+    getCurrentShortcut: async () =>
+      await electron.ipcRenderer.invoke('internal:get-current-shortcut'),
     onHotkeyRecorded: (callback) => {
       if (callback && typeof callback === 'function') {
         hotkeyRecordedCallback = callback

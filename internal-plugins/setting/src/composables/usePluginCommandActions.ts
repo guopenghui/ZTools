@@ -79,7 +79,7 @@ export function usePluginCommandActions(options: UsePluginCommandActionsOptions)
     pluginName: string,
     featureCode: string,
     cmdName: string,
-    cmdType: CommandCmdType
+    cmdType: 'text' | 'window'
   ): string {
     return _getCommandId({
       type: 'plugin',
@@ -96,7 +96,7 @@ export function usePluginCommandActions(options: UsePluginCommandActionsOptions)
     pluginName: string,
     featureCode: string,
     cmdName: string,
-    cmdType: CommandCmdType
+    cmdType: 'text' | 'window'
   ): boolean {
     const id = getPluginCommandId(pluginName, featureCode, cmdName, cmdType)
     return disabledCommands.value.includes(id)
@@ -106,7 +106,7 @@ export function usePluginCommandActions(options: UsePluginCommandActionsOptions)
     pluginName: string,
     featureCode: string,
     cmdName: string,
-    cmdType: CommandCmdType
+    cmdType: 'text' | 'window'
   ): Promise<void> {
     const id = getPluginCommandId(pluginName, featureCode, cmdName, cmdType)
     const index = disabledCommands.value.indexOf(id)
@@ -436,7 +436,7 @@ export function usePluginCommandActions(options: UsePluginCommandActionsOptions)
     pluginName: string,
     featureCode: string,
     cmdName: string,
-    cmdType: CommandCmdType
+    cmdType: 'text' | 'window'
   ): Promise<void> {
     if (key === 'toggle') {
       await toggleCommandDisabled(pluginName, featureCode, cmdName, cmdType)
