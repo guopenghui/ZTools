@@ -126,6 +126,11 @@ export class SettingsAPI {
           await windowManager.updateAutoBackToSearch(data.autoBackToSearch)
           console.log('[Settings] 启动时应用自动返回搜索设置:', data.autoBackToSearch)
         }
+        // 应用窗口呼出位置策略设置
+        if (data.windowPositionStrategy) {
+          await windowManager.updateWindowPositionStrategy(data.windowPositionStrategy)
+          console.log('[Settings] 启动时应用窗口呼出位置策略:', data.windowPositionStrategy)
+        }
         // 应用代理配置
         if (data.proxyEnabled !== undefined && data.proxyUrl !== undefined) {
           proxyManager.setProxyConfig({

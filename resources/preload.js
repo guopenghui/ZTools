@@ -1058,6 +1058,8 @@ window.ztools = {
     // 通知主渲染进程更新自动返回搜索配置
     updateAutoBackToSearch: async (autoBackToSearch) =>
       await electron.ipcRenderer.invoke('internal:update-auto-back-to-search', autoBackToSearch),
+    updateWindowPositionStrategy: async (strategy) =>
+      await electron.ipcRenderer.invoke('internal:update-window-position-strategy', strategy),
     // 通知主渲染进程更新显示最近使用配置
     updateShowRecentInSearch: async (showRecentInSearch) =>
       await electron.ipcRenderer.invoke(
