@@ -132,7 +132,7 @@ const showHotkeyQuickActions = ref(false)
 
 // 本地状态（替代 windowStore）
 const theme = ref<ThemeType>('system')
-const primaryColor = ref<PrimaryColor>('blue')
+const primaryColor = ref<PrimaryColor>('green')
 const placeholder = ref(DEFAULT_PLACEHOLDER)
 const avatar = ref(DEFAULT_AVATAR)
 const autoPaste = ref<AutoPasteOption>('3s')
@@ -256,9 +256,9 @@ const autoCheckUpdate = ref(true)
 
 // 主题色选项
 const themeColors = [
+  { label: '翡翠绿', value: 'green', hex: '#059669' },
   { label: '天空蓝', value: 'blue', hex: '#0284c7' },
   { label: '罗兰紫', value: 'purple', hex: '#7c3aed' },
-  { label: '翡翠绿', value: 'green', hex: '#059669' },
   { label: '活力橙', value: 'orange', hex: '#ea580c' },
   { label: '宝石红', value: 'red', hex: '#dc2626' }
 ]
@@ -1170,7 +1170,7 @@ async function loadSettings(): Promise<void> {
       recentRows.value = data.recentRows ?? 2
       pinnedRows.value = data.pinnedRows ?? 2
       theme.value = data.theme ?? 'system'
-      primaryColor.value = data.primaryColor ?? 'blue'
+      primaryColor.value = data.primaryColor ?? 'green'
       searchMode.value = data.searchMode ?? 'aggregate'
       autoCheckUpdate.value = data.autoCheckUpdate ?? true
       tabKeyFunction.value =

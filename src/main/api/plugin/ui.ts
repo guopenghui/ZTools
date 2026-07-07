@@ -338,7 +338,7 @@ export class PluginUIAPI {
     const settings = databaseAPI.dbGet('settings-general')
     return {
       isDark: nativeTheme.shouldUseDarkColors,
-      primaryColor: settings?.primaryColor || 'blue',
+      primaryColor: settings?.primaryColor || 'green',
       customColor: settings?.customColor,
       windowMaterial: windowManager.getWindowMaterial()
     }
