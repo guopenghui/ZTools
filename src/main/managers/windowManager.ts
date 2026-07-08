@@ -102,7 +102,8 @@ class WindowManager {
   // Double-tap 唤醒窗口时，Windows 可能紧跟一个短暂 blur；这两个 timer 用于跳过误关闭并补一次焦点。
   private doubleTapFocusTimer: ReturnType<typeof setTimeout> | null = null
   private windowsHotkeyFocusTimer: ReturnType<typeof setTimeout> | null = null
-  private doubleTapSuppressBlurTimer: ReturnType<typeof setTimeout> | null = null
+  private transientBlurSuppressTimer: ReturnType<typeof setTimeout> | null = null
+  private transientBlurSuppressUntil: number = 0 // 瞬时 blur 抑制截止时间戳，取最长值避免提前释放
   // 全局左键状态用于区分“点击外部关闭”和“从外部拖文件进窗口”。拖拽时 blur 先挂起，等 mouseup 再判断。
   private leftMouseDown: boolean = false // 全局左键是否按下，用于拖拽时延迟 blur 隐藏
   private pendingBlurHideOnMouseUp: boolean = false // blur 时左键按下，等待 mouseup 再决定是否隐藏
@@ -159,6 +160,30 @@ class WindowManager {
 
   private isBlurHideSuppressed(): boolean {
     return this.suppressBlurHide || this.modalDialogBlurHideSuppressed
+  }
+
+  /**
+   * 短暂抑制 blur 自动隐藏窗口。
+   *
+   * 窗口激活/呼出瞬间（尤其在其它应用处于全屏时抢焦点）系统可能补发一次瞬时 blur，
+   * 若不抑制会立刻触发 hideWindow 造成"一闪而过"。多次调用取最长的抑制时长，
+   * 避免后一次较短抑制把先前更长的抑制提前释放（例如双击唤醒与普通呼出叠加）。
+   */
+  private suppressBlurHideTransiently(durationMs: number): void {
+    this.suppressBlurHide = true
+    const until = Date.now() + durationMs
+    if (this.transientBlurSuppressTimer && this.transientBlurSuppressUntil >= until) {
+      return
+    }
+    if (this.transientBlurSuppressTimer) {
+      clearTimeout(this.transientBlurSuppressTimer)
+    }
+    this.transientBlurSuppressUntil = until
+    this.transientBlurSuppressTimer = setTimeout(() => {
+      this.suppressBlurHide = false
+      this.transientBlurSuppressTimer = null
+      this.transientBlurSuppressUntil = 0
+    }, durationMs)
   }
 
   private beginModalDialogBlurHideSuppression(): void {
@@ -756,12 +781,7 @@ class WindowManager {
     const willShow = !(this.mainWindow.isFocused() && this.mainWindow.isVisible())
     if (willShow) {
       // Double-tap 的 uiohook 回调刚触发后，系统可能补发一次 transient blur，短暂忽略避免刚显示就关闭。
-      this.suppressBlurHide = true
-      if (this.doubleTapSuppressBlurTimer) clearTimeout(this.doubleTapSuppressBlurTimer)
-      this.doubleTapSuppressBlurTimer = setTimeout(() => {
-        this.suppressBlurHide = false
-        this.doubleTapSuppressBlurTimer = null
-      }, 350)
+      this.suppressBlurHideTransiently(350)
     }
 
     this.toggleWindow()
@@ -782,19 +802,22 @@ class WindowManager {
   private forceActivateWindow(): void {
     if (!this.mainWindow) return
 
-    // 1. 显示窗口
-    this.mainWindow.show()
-
-    // 2. macOS特殊处理：重申置顶，防止因为系统事件掉层级
+    // macOS：dock 隐藏的本应用属于 accessory，面板依靠 visibleOnFullScreen 才能覆盖全屏应用。
+    // 关键顺序：先把应用激活到当前 Space 再 show，否则面板会落到桌面 Space（表现为"一闪而过、
+    // 需到桌面查看"）。同时短暂抑制 blur，避免抢焦点瞬间被全屏应用补发的瞬时 blur 立即关闭。
     if (platform.isMacOS) {
+      this.suppressBlurHideTransiently(200)
+      this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
       this.mainWindow.setAlwaysOnTop(true, 'modal-panel', 1)
+      app.focus({ steal: true })
+      this.mainWindow.show()
+      this.mainWindow.focus()
       return
     }
 
-    // 3. 设置窗口层级为最前
+    // Windows / Linux：显示后重申层级并聚焦
+    this.mainWindow.show()
     this.mainWindow.setAlwaysOnTop(true)
-
-    // 4. 聚焦窗口
     this.mainWindow.focus()
   }
 
@@ -1415,9 +1438,15 @@ class WindowManager {
       }
 
       this.moveWindowToCursor()
-      // macOS: forceActivateWindow 不会 setAlwaysOnTop/focus，需要单独处理焦点抢占
-      this.mainWindow.show()
       if (platform.isMacOS) {
+        // 与 forceActivateWindow 一致的激活顺序：先重申 Spaces/层级、激活应用到当前 Space，
+        // 再 show，避免面板落到桌面 Space。此处不直接调用 forceActivateWindow：本路径已用
+        // 外层手动 suppressBlurHide（500ms 释放）覆盖激活期，forceActivateWindow 内部的瞬时
+        // 抑制(200ms)会把它提前释放。
+        this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+        this.mainWindow.setAlwaysOnTop(true, 'modal-panel', 1)
+        app.focus({ steal: true })
+        this.mainWindow.show()
         this.mainWindow.focus()
       } else {
         this.forceActivateWindow()
