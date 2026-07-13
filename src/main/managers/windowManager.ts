@@ -160,7 +160,11 @@ class WindowManager {
   }
 
   private isBlurHideSuppressed(): boolean {
-    return this.suppressBlurHide || this.modalDialogBlurHideSuppressed
+    return (
+      this.suppressBlurHide ||
+      this.modalDialogBlurHideSuppressed ||
+      this.transientBlurSuppressTimer !== null
+    )
   }
 
   /**
@@ -171,7 +175,6 @@ class WindowManager {
    * 避免后一次较短抑制把先前更长的抑制提前释放（例如双击唤醒与普通呼出叠加）。
    */
   private suppressBlurHideTransiently(durationMs: number): void {
-    this.suppressBlurHide = true
     const until = Date.now() + durationMs
     if (this.transientBlurSuppressTimer && this.transientBlurSuppressUntil >= until) {
       return
@@ -181,7 +184,6 @@ class WindowManager {
     }
     this.transientBlurSuppressUntil = until
     this.transientBlurSuppressTimer = setTimeout(() => {
-      this.suppressBlurHide = false
       this.transientBlurSuppressTimer = null
       this.transientBlurSuppressUntil = 0
     }, durationMs)
@@ -804,16 +806,12 @@ class WindowManager {
   private forceActivateWindow(): void {
     if (!this.mainWindow) return
 
-    // macOS：dock 隐藏的本应用属于 accessory，面板依靠 visibleOnFullScreen 才能覆盖全屏应用。
-    // 关键顺序：先把应用激活到当前 Space 再 show，否则面板会落到桌面 Space（表现为"一闪而过、
-    // 需到桌面查看"）。同时短暂抑制 blur，避免抢焦点瞬间被全屏应用补发的瞬时 blur 立即关闭。
+    // macOS 使用非激活 panel 保留原应用的前台状态。短暂抑制呼出瞬间的 blur，
+    // 但不要激活整个应用，否则会破坏快捷面板不抢占原应用焦点的交互语义。
     if (platform.isMacOS) {
       this.suppressBlurHideTransiently(200)
-      this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
       this.mainWindow.setAlwaysOnTop(true, 'modal-panel', 1)
-      app.focus({ steal: true })
       this.mainWindow.show()
-      this.mainWindow.focus()
       return
     }
 

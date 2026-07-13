@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 type MockHandler = (...args: any[]) => void
 
@@ -40,6 +40,7 @@ const mocks = vi.hoisted(() => {
       isFocused: vi.fn(() => false),
       isVisible: vi.fn(() => false),
       show: vi.fn(() => emit('show')),
+      emit,
       hide: vi.fn(),
       blur: vi.fn(),
       focus: vi.fn(),
@@ -76,6 +77,7 @@ vi.mock('@electron-toolkit/utils', () => ({
 
 vi.mock('electron', () => ({
   app: {
+    getAppPath: vi.fn(() => '/tmp/ztools'),
     focus: mocks.appFocus,
     dock: {
       show: vi.fn(),
@@ -188,13 +190,18 @@ vi.mock('../../src/main/managers/pluginManager', () => ({
 
 describe('windowManager macOS activation', () => {
   beforeEach(() => {
+    vi.useFakeTimers()
     vi.clearAllMocks()
     mocks.dbGet.mockReturnValue(null)
     mocks.clipboardGetCurrentWindow.mockReturnValue(null)
     mocks.latestWindow.current = null
   })
 
-  it('activates and focuses the app when showing the main window on macOS', async () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shows the main panel without activating the app on macOS', async () => {
     const { default: windowManager } = await import('../../src/main/managers/windowManager')
 
     windowManager.createWindow()
@@ -204,12 +211,20 @@ describe('windowManager macOS activation', () => {
     expect(mocks.latestWindow.current.setVisibleOnAllWorkspaces).toHaveBeenCalledWith(true, {
       visibleOnFullScreen: true
     })
+    expect(mocks.latestWindow.current.setVisibleOnAllWorkspaces).toHaveBeenCalledTimes(1)
     expect(mocks.latestWindow.current.setAlwaysOnTop).toHaveBeenLastCalledWith(
       true,
       'modal-panel',
       1
     )
-    expect(mocks.appFocus).toHaveBeenCalledWith({ steal: true })
-    expect(mocks.latestWindow.current.focus).toHaveBeenCalled()
+    expect(mocks.appFocus).not.toHaveBeenCalled()
+    expect(mocks.latestWindow.current.focus).not.toHaveBeenCalled()
+
+    mocks.latestWindow.current.emit('blur')
+    expect(mocks.latestWindow.current.hide).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(201)
+    mocks.latestWindow.current.emit('blur')
+    expect(mocks.latestWindow.current.hide).toHaveBeenCalledTimes(1)
   })
 })
