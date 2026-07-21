@@ -1,14 +1,22 @@
-# 3.0.0-beta.8
+# 3.0.0-beta.10
 
 ## 新功能 (Feat)
 
 - 支持github登录
 - 支持zpx安装为asar
+- win和mac更新方式更改为完整包更新
+- macOS 启动时新增辅助功能权限检查与引导窗口，支持跳转系统设置、检测授权结果和重置异常权限
 - 新增服务端同步能力，接入账号体系、服务端 checkpoint、文档 revision、冲突版本、附件 blob 同步和弱网重试队列
 - 新增 3.0 数据目录与多账号数据隔离能力，支持 `~/.ztools` 新目录、设备库/账号库拆分、旧数据导入和登录后导入本地数据
 - 插件市场改为服务端 API 数据源，支持 banner、分类、下载记录、下载量、插件详情 README 缓存、平台过滤、随机推荐和下载地址按需获取
 - 新增插件市场评论能力，支持登录评论、回复、点赞、删除自己的评论和用户头像展示
 - 新增账号登录状态入口、个人中心、头像修改、云空间占用和文档附件统计
+- 支持匹配推荐置顶
+- 全部指令搜索支持搜索插件命令
+- 我的数据支持单条删除和单条数据导出
+- 安装包安装插件后支持立即打开
+- 支持自定义 Windows 安装路径
+- macOS 支持搜索启动嵌套子目录中的应用，并优化 PWA/应用目录扫描
 - 新增 Provider 抽象系统，支持插件提供翻译和 OCR 能力，并支持单插件对每种 type 声明多条 Provider（PR [#560](../../pull/560)，感谢 [@Particaly](https://github.com/Particaly) 的贡献 🎉）
 - 插件详情指令列表新增打开、固定、快捷键、别名、禁用等操作入口（PR [#567](../../pull/567)，感谢 [@Particaly](https://github.com/Particaly) 的贡献 🎉）
 - 快捷键设置支持选择目标指令，并新增快捷键目标选择弹窗（PR [#574](../../pull/574)，感谢 [@Particaly](https://github.com/Particaly) 的贡献 🎉）
@@ -17,18 +25,10 @@
 - 新增窗口呼出位置策略设置，支持记住上次位置、鼠标屏居中、主屏居中、上次活动屏居中（PR [#558](../../pull/558)，感谢 [@Cateds](https://github.com/Cateds) 的贡献 🎉）
 - 超级面板支持文件位置快捷跳转（PR [#532](../../pull/532)，感谢 [@Particaly](https://github.com/Particaly) 的贡献 🎉）
 - 支持禁用 ESC 退出插件，便于插件内弹窗自行处理 ESC（PR [#556](../../pull/556)，感谢 [@yunser](https://github.com/yunser) 的贡献 🎉）
-- 全部指令搜索支持搜索插件命令
-- 我的数据支持单条删除和单条数据导出
-- 安装包安装插件后支持立即打开
-- 支持自定义 Windows 安装路径
-- macOS 支持搜索启动嵌套子目录中的应用，并优化 PWA/应用目录扫描
 - 通用设置新增「终端打开」选项，可为 Finder 等文件管理器中的「在终端打开」功能选择终端应用；支持 macOS 的 Terminal、Ghostty、iTerm2，Windows 的 Windows Terminal、PowerShell、CMD，以及 Linux 的 GNOME Terminal、Konsole、XTerm，并支持使用 `{path}` 配置自定义命令（PR [#569](../../pull/569)，感谢 [@thirking](https://github.com/thirking) 的贡献 🎉）
-- macOS 启动时新增辅助功能权限检查与引导窗口，支持跳转系统设置、检测授权结果和重置异常权限
-- Windows 更新机制改用 `electron-updater` 下载并安装完整安装包，降低自定义升级程序引发安全软件误报的概率；旧版安装会引导完成一次完整安装，用户数据、设置和插件保持不变
 
 ## 修复 (Fix)
 
-- 修复附件云同步拉取后只有 `_attachments` metadata 但缺少本地二进制时不会下载 blob 的问题
 - 修复「上次活动屏居中」策略在跨屏或异常坐标场景下可能定位不准确的问题，并增加 `NaN` / `Infinity` 防御（PR [#558](../../pull/558)，感谢 [@Cateds](https://github.com/Cateds) 的贡献 🎉）
 - 修复对象型指令缺失 type 导致搜索栏与历史记录空白的问题
 - 修复 Windows 开始菜单根级快捷方式无法扫描和监听的问题（PR [#552](../../pull/552)，感谢 [@gdm257](https://github.com/gdm257) 的贡献 🎉）
