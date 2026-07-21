@@ -14,7 +14,6 @@ import {
   focusAccessibilityPermissionWindow,
   isAccessibilityPermissionWindowActive
 } from './core/accessibilityPermissionGate'
-import detachedWindowManager from './core/detachedWindowManager'
 import {
   handleFirstRunStorageImport,
   isLegacyImportWindowActive
@@ -32,6 +31,11 @@ import windowManager from './managers/windowManager'
 // 待打开的 .zpx 文件路径（在 app.ready 之前收到的文件打开事件）
 let pendingZpxFile: string | null = null
 let applicationInitialized = false
+
+// macOS 在 ready 事件前隐藏 Dock 图标，避免应用启动期间短暂显示。
+if (platform.isMacOS) {
+  app.dock?.hide()
+}
 
 app.on('second-instance', (_event, argv) => {
   // Windows: 检查命令行参数中是否有 .zpx 文件路径
@@ -139,13 +143,6 @@ app.whenReady().then(async () => {
 
   // ✅ 首先加载内置插件
   loadInternalPlugins()
-
-  // 隐藏 Dock 图标（仅在没有分离窗口时隐藏）
-  if (platform.isMacOS) {
-    if (!detachedWindowManager.hasDetachedWindows()) {
-      app.dock?.hide()
-    }
-  }
 
   // 创建主窗口
   const mainWindow = windowManager.createWindow()
